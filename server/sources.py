@@ -1,33 +1,22 @@
-"""Orpheus Sources — link Spotify / Apple Music / YouTube Music accounts
-and import playlists + liked songs into the local library.
+"""Orpheus Sources — link a Spotify account (official OAuth, PKCE) and import
+your playlists and liked songs as *metadata*: title, artist, album, art.
 
-Philosophy: providers are *catalogs*, not gatekeepers. We import your
-metadata locally (title/artist/album/art), and playback resolves each
-track lazily to a playable stream (YT Music match) — so a playlist you
-built on Spotify plays fine even without Spotify.
-
-Linking (one-time, personal-use):
-  spotify  → sp_dc cookie from open.spotify.com (DevTools → Cookies)
-  apple    → media-user-token from music.apple.com (DevTools → Storage)
-  ytmusic  → full request headers from music.youtube.com (ytmusicapi)
+Playback stays local: each imported row is matched lazily against the files
+in your library folder. A playlist you built on Spotify plays here with the
+copies you already own; rows with no local match simply don't play. Spotify
+Connect playback of the same playlists is handled by frame.py.
 """
 from __future__ import annotations
 
-import asyncio
-import json
 import time
 from typing import Any, Optional
 
 import httpx
 from fastapi import APIRouter, HTTPException
-from ytmusicapi import YTMusic
-
-from .music import _yt as _yt_anon, _norm_song
+from .library import match_track
 from .store import db, set_setting, setting
 
 router = APIRouter(prefix="/api")
-
-_UA = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/125.0 Safari/537.36"
 
 
 # ---------------------------------------------------------------- helpers
@@ -45,10 +34,10 @@ def _playlist_upsert(source: str, external_id: str, name: str, art: Optional[str
     c.execute("DELETE FROM playlist_tracks WHERE playlist_id=?", (pid,))
     for i, t in enumerate(tracks):
         c.execute(
-            "INSERT INTO playlist_tracks(playlist_id,pos,title,artist,album,art,duration,yt_id) "
+            "INSERT INTO playlist_tracks(playlist_id,pos,title,artist,album,art,duration,match_id) "
             "VALUES(?,?,?,?,?,?,?,?)",
             (pid, i, t.get("title"), t.get("artist"), t.get("album"), t.get("art"),
-             t.get("duration"), t.get("yt_id")),
+             t.get("duration"), t.get("match_id")),
         )
     c.commit()
     return pid
@@ -258,137 +247,9 @@ def _sp_norm(t: dict) -> dict:
     }
 
 
-# ---------------------------------------------------------------- apple music
-async def _apple_dev_token() -> str:
-    cached = setting("apple_dev_token")
-    if cached:
-        tok, exp = cached.split("|", 1)
-        if float(exp) > time.time() + 3600:
-            return tok
-    import re
-    async with httpx.AsyncClient(timeout=20.0, headers={"User-Agent": _UA}, follow_redirects=True) as c:
-        page = await c.get("https://music.apple.com/us/browse")
-        m = re.search(r'/assets/index[^"]*?\.js', page.text)
-        if not m:
-            raise HTTPException(502, "could not locate apple bundle")
-        js = await c.get("https://music.apple.com" + m.group(0))
-        jm = re.search(r'"(eyJh[\w-]+\.[\w-]+\.[\w-]+)"', js.text)
-        if not jm:
-            raise HTTPException(502, "could not extract apple developer token")
-        tok = jm.group(1)
-    set_setting("apple_dev_token", f"{tok}|{time.time() + 12 * 3600}")
-    return tok
-
-
-@router.post("/sources/apple/link")
-async def apple_link(payload: dict):
-    mut = (payload.get("media_user_token") or "").strip()
-    if not mut:
-        raise HTTPException(400, "media_user_token required")
-    dev = await _apple_dev_token()
-    async with httpx.AsyncClient(timeout=20.0) as c:
-        r = await c.get(
-            "https://amp-api.music.apple.com/v1/me/library/playlists?limit=1",
-            headers={"Authorization": f"Bearer {dev}", "Media-User-Token": mut, "Origin": "https://music.apple.com"},
-        )
-        if r.status_code in (401, 403):
-            raise HTTPException(401, "apple rejected media-user-token")
-    set_setting("apple_mut", mut)
-    return {"ok": True}
-
-
-@router.post("/sources/apple/import")
-async def apple_import():
-    mut = setting("apple_mut")
-    if not mut:
-        raise HTTPException(428, "apple music not linked")
-    dev = await _apple_dev_token()
-    hdr = {"Authorization": f"Bearer {dev}", "Media-User-Token": mut, "Origin": "https://music.apple.com"}
-    imported = []
-    async with httpx.AsyncClient(timeout=25.0, headers=hdr) as c:
-        r = await c.get("https://amp-api.music.apple.com/v1/me/library/playlists?limit=100")
-        r.raise_for_status()
-        for pl in r.json().get("data", []):
-            plid = pl["id"]
-            name = (pl.get("attributes") or {}).get("name", "?")
-            tracks, url = [], f"https://amp-api.music.apple.com/v1/me/library/playlists/{plid}/tracks?limit=100"
-            while url and len(tracks) < 400:
-                tr = await c.get(url)
-                if tr.status_code != 200:
-                    break
-                td = tr.json()
-                for it in td.get("data", []):
-                    a = it.get("attributes") or {}
-                    art = ((a.get("artwork") or {}).get("url") or "").replace("{w}", "600").replace("{h}", "600")
-                    tracks.append({
-                        "title": a.get("name"), "artist": a.get("artistName"),
-                        "album": a.get("albumName"), "art": art or None,
-                        "duration": (a.get("durationInMillis") or 0) // 1000 or None,
-                    })
-                nxt = td.get("next")
-                url = ("https://amp-api.music.apple.com" + nxt) if nxt else None
-            if tracks:
-                pid = _playlist_upsert("apple", plid, name, tracks[0].get("art"), tracks)
-                imported.append({"id": pid, "name": name, "tracks": len(tracks)})
-    return {"ok": True, "imported": imported}
-
-
-# ---------------------------------------------------------------- yt music
-@router.post("/sources/ytmusic/link")
-async def ytmusic_link(payload: dict):
-    """payload: {headers: 'raw request headers copied from music.youtube.com'}"""
-    raw = (payload.get("headers") or "").strip()
-    if not raw:
-        raise HTTPException(400, "headers required")
-    import ytmusicapi
-    try:
-        auth_str = ytmusicapi.setup(filepath=None, headers_raw=raw)
-        yt = YTMusic(auth_str)
-        pls = await asyncio.to_thread(yt.get_library_playlists, 1)
-    except Exception as e:
-        raise HTTPException(401, f"ytmusic setup failed: {e}") from e
-    set_setting("ytmusic_auth", auth_str if isinstance(auth_str, str) else json.dumps(auth_str))
-    return {"ok": True, "playlists_visible": len(pls)}
-
-
-@router.post("/sources/ytmusic/import")
-async def ytmusic_import():
-    auth = setting("ytmusic_auth")
-    if not auth:
-        raise HTTPException(428, "ytmusic not linked")
-    yt = YTMusic(auth)
-    imported = []
-    liked = await asyncio.to_thread(yt.get_liked_songs, 300)
-    ltracks = [_norm_song(t) | {"yt_id": t.get("videoId")} for t in liked.get("tracks", [])]
-    if ltracks:
-        pid = _playlist_upsert("ytmusic", "liked", "Liked Music (YT)",
-                               ltracks[0].get("art"), ltracks)
-        imported.append({"id": pid, "name": "Liked Music (YT)", "tracks": len(ltracks)})
-    pls = await asyncio.to_thread(yt.get_library_playlists, 50)
-    for pl in pls:
-        plid = pl.get("playlistId")
-        if not plid or plid in ("LM",):
-            continue
-        try:
-            data = await asyncio.to_thread(yt.get_playlist, plid, 400)
-        except Exception:
-            continue
-        tracks = [_norm_song(t) | {"yt_id": t.get("videoId")} for t in data.get("tracks", []) if t.get("videoId")]
-        if tracks:
-            pid = _playlist_upsert("ytmusic", plid, pl.get("title", "?"),
-                                   tracks[0].get("art"), tracks)
-            imported.append({"id": pid, "name": pl.get("title"), "tracks": len(tracks)})
-    return {"ok": True, "imported": imported}
-
-
-# ---------------------------------------------------------------- library
 @router.get("/sources/status")
 async def sources_status():
-    return {
-        "spotify": setting("spotify_refresh_token") is not None,
-        "apple": setting("apple_mut") is not None,
-        "ytmusic": setting("ytmusic_auth") is not None,
-    }
+    return {"spotify": setting("spotify_refresh_token") is not None}
 
 
 @router.get("/library")
@@ -413,7 +274,7 @@ async def library_playlist(pid: int):
         "id": pl["id"], "name": pl["name"], "source": pl["source"], "art": pl["art"],
         "tracks": [
             {"title": r["title"], "artist": r["artist"], "album": r["album"],
-             "art": r["art"], "duration": r["duration"], "id": r["yt_id"],
+             "art": r["art"], "duration": r["duration"], "id": r["match_id"],
              "pos": r["pos"], "source": pl["source"]}
             for r in rows
         ],
@@ -422,32 +283,20 @@ async def library_playlist(pid: int):
 
 @router.post("/library/{pid}/resolve/{pos}")
 async def resolve_track(pid: int, pos: int):
-    """Lazily match an imported track to a playable YT Music id."""
+    """Lazily match an imported row to a file in the library folder."""
     r = db().execute(
         "SELECT * FROM playlist_tracks WHERE playlist_id=? AND pos=?", (pid, pos)
     ).fetchone()
     if not r:
         raise HTTPException(404, "no such track")
-    if r["yt_id"]:
-        return {"id": r["yt_id"]}
-    q = f'{r["title"]} {r["artist"] or ""}'.strip()
-    hits = await asyncio.to_thread(_yt_anon.search, q, "songs", None, 5)
-    best = None
-    want_dur = r["duration"]
-    for h in hits:
-        if not h.get("videoId"):
-            continue
-        if want_dur and h.get("duration_seconds") and abs(h["duration_seconds"] - want_dur) > 15:
-            continue
-        best = h
-        break
-    if not best and hits:
-        best = next((h for h in hits if h.get("videoId")), None)
-    if not best:
-        raise HTTPException(404, "no playable match found")
+    if r["match_id"]:
+        return {"id": r["match_id"]}
+    hit = match_track(r["title"], r["artist"], r["duration"])
+    if not hit:
+        raise HTTPException(404, "not in your library")
     db().execute(
-        "UPDATE playlist_tracks SET yt_id=? WHERE playlist_id=? AND pos=?",
-        (best["videoId"], pid, pos),
+        "UPDATE playlist_tracks SET match_id=? WHERE playlist_id=? AND pos=?",
+        (hit["id"], pid, pos),
     )
     db().commit()
-    return {"id": best["videoId"]}
+    return {"id": hit["id"], "art": hit["art"]}

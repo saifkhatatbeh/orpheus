@@ -232,7 +232,7 @@ input[type=range]::-webkit-slider-thumb{
 .t-row .t-t{font-size:.78rem}
 .t-row .t-a{font-size:.64rem;color:var(--ink-60)}
 .t-row .t-d{margin-left:auto;font-size:.64rem;color:var(--ink-35)}
-.t-row .vaulted{color:var(--acid);font-size:.6rem;letter-spacing:.1em}
+.t-row .t-src{color:var(--acid);font-size:.6rem;letter-spacing:.1em;opacity:.8;max-width:10rem;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 
 /* ═══ radio ═══ */
 .line-input{
@@ -261,36 +261,9 @@ textarea.line-input{border:2px solid var(--ink);padding:.6rem;text-transform:non
 .station .st-n{font-size:.74rem;letter-spacing:.04em;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .station .st-m{font-size:.6rem;color:var(--ink-60);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 
-/* ═══ vinyl ═══ */
-#vinyl-stage{min-height:56vh;display:grid;place-items:center;text-align:center;padding-top:2rem}
-#vinyl-idle h1{font-size:clamp(2.6rem,7vw,5rem);margin:.8rem 0}
-.big-cta{
-  margin-top:2rem;padding:1rem 2.6rem;border:2px solid var(--acid);color:var(--acid);
-  font-size:.95rem;letter-spacing:.2em;transition:.15s;
-}
-.big-cta:hover{background:var(--acid);color:var(--on-acid)}
-.big-cta.rec{background:var(--acid);color:var(--on-acid);animation:blink 1s steps(2) infinite}
-@keyframes blink{50%{opacity:.55}}
-#vinyl-status{margin-top:1.2rem;min-height:1.2em;font-size:.72rem;letter-spacing:.14em}
-#vinyl-result{
-  display:grid;grid-template-columns:minmax(240px,400px) 1fr;gap:3rem;
-  align-items:center;text-align:left;width:100%;max-width:960px;
-}
-#vinyl-sleeve{position:relative;aspect-ratio:1;padding:10px}
-#vinyl-art{width:100%;height:100%;object-fit:cover;display:block}
-.corner{position:absolute;width:26px;height:26px;border:2px solid var(--acid)}
-.corner.tl{top:0;left:0;border-right:none;border-bottom:none}
-.corner.tr{top:0;right:0;border-left:none;border-bottom:none}
-.corner.bl{bottom:0;left:0;border-right:none;border-top:none}
-.corner.br{bottom:0;right:0;border-left:none;border-top:none}
-#vinyl-title{font-size:clamp(2rem,4.6vw,3.6rem);margin:.5rem 0}
-#vinyl-artist{font-size:1rem;letter-spacing:.1em}
-#vinyl-album,#vinyl-extra{font-size:.72rem;margin-top:.3rem}
-#vinyl-meta button{margin-top:1.6rem}
-
-/* ═══ vault ═══ */
-#vault-stats{font-size:.72rem;letter-spacing:.18em;margin-bottom:1.4rem}
-#vault-list{border-top:2px solid var(--ink)}
+/* ═══ files ═══ */
+#files-stats{font-size:.72rem;letter-spacing:.18em;margin-bottom:1.4rem}
+#files-list{border-top:2px solid var(--ink)}
 
 /* ═══ overlays ═══ */
 .overlay{
@@ -340,7 +313,6 @@ body[data-theme="void"] .overlay{background:rgba(0,0,0,.7)}
 .node-row .n-badge{margin-left:auto;font-size:.58rem;letter-spacing:.2em}
 #party-row{display:flex;gap:.7rem;align-items:center;padding:.8rem 0;cursor:pointer;font-size:.72rem;letter-spacing:.1em}
 #party-row input{width:16px;height:16px;accent-color:var(--acid)}
-.alexa-cmd{display:flex;gap:.6rem;margin:.8rem 0;align-items:flex-end}
 .dlna-row{display:flex;align-items:center;gap:.6rem;padding:.4rem 0;font-size:.74rem}
 
 /* sources */
@@ -378,8 +350,6 @@ body[data-theme="void"] .overlay{background:rgba(0,0,0,.7)}
   #now{text-align:center}
   #transport{justify-content:center}
   #vol-row{margin-inline:auto}
-  #vinyl-result{grid-template-columns:1fr;text-align:center;gap:1.8rem}
-  #vinyl-sleeve{max-width:280px;margin:0 auto}
   h1.display{font-size:clamp(2rem,9vw,3rem)}
   .panel{padding:1.1rem}
 }

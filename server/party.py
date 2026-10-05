@@ -15,8 +15,8 @@ Architecture (replaces the old browser-drift + Spotify Connect approach):
 - Echo/Frame stay OUT of the sample-sync domain (cloud hardware can't be
   clock-driven); they remain normal single-target nodes outside party mode.
 
-Feeder: ffmpeg pulls the SAME resolved stream the deck plays (vault file if
-archived, else the googlevideo URL), decodes to raw PCM, pipes to snapserver.
+Feeder: ffmpeg reads the SAME source the deck plays (the library file, or
+the station's stream URL), decodes to raw PCM, pipes to snapserver.
 Track changes = kill ffmpeg, start next. Radio stations work identically.
 """
 from __future__ import annotations
@@ -32,8 +32,7 @@ import httpx
 from fastapi import APIRouter, HTTPException
 
 from .constellation import hub
-from .music import resolve_stream
-from .vault import vault_path
+from .library import track_path
 
 router = APIRouter(prefix="/api")
 
@@ -126,11 +125,11 @@ async def _start_feed_for_state(state: dict, force: bool = False) -> Optional[st
         src, key, is_url = state["station"]["url"], f"st:{state['station']['url']}", True
     elif state.get("track") and state["track"].get("id"):
         vid = state["track"]["id"]
-        local = vault_path(vid)
-        if local:
-            src, is_url = str(local), False
-        else:
-            src, is_url = await resolve_stream(vid), True
+        local = track_path(vid)
+        if not local:
+            await _stop_feed()
+            return None  # track left the library folder; nothing to feed
+        src, is_url = str(local), False
         key = f"tr:{vid}"
         # resume from the deck's current position (seek / mid-track party flip)
         if state.get("playing"):

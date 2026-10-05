@@ -1,11 +1,14 @@
 # --- personal data: NEVER commit ---
 orpheus.db
 orpheus.db-*
-alexa_cookie.json
-vault/
+library/
+.art/
 *.m4a
 *.mp3
+*.flac
 *.opus
+*.ogg
+*.wav
 *.webm
 
 # --- python ---

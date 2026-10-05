@@ -1,4 +1,4 @@
-"""Orpheus — local-first music command deck. Run: python -m server.main"""
+"""Orpheus — local-first sound system. Run: python -m server.main"""
 from __future__ import annotations
 
 import asyncio
@@ -13,7 +13,9 @@ from . import store
 
 store.init()  # before routers import db state
 
-from . import alexa, constellation, dlna, frame, guest, lyrics, music, party, sources, stations, vault, vinyl  # noqa: E402
+from . import constellation, dlna, frame, guest, library, lyrics, party, sources, stations  # noqa: E402
+
+library.init()
 
 app = FastAPI(title="Orpheus", docs_url="/api/docs", openapi_url="/api/openapi.json")
 
@@ -24,7 +26,7 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-for mod in (music, constellation, vinyl, stations, dlna, alexa, sources, vault, lyrics, guest, frame, party):
+for mod in (library, constellation, stations, dlna, sources, lyrics, guest, frame, party):
     app.include_router(mod.router)
 
 WEB = Path(__file__).resolve().parent.parent / "web"
@@ -34,7 +36,7 @@ app.mount("/assets", StaticFiles(directory=WEB / "assets"), name="assets")
 @app.on_event("startup")
 async def _startup():
     party.cleanup_orphans()  # stray ffmpeg feeders from a crashed run
-    asyncio.create_task(vault.archive_worker())
+    asyncio.create_task(library.scan())  # index the library folder in the background
 
 
 @app.get("/")

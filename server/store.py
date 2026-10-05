@@ -1,4 +1,4 @@
-"""Orpheus local store — sqlite for plays, vault index, imported library."""
+"""Orpheus local store — sqlite for plays, the library index and imported playlists."""
 from __future__ import annotations
 
 import json
@@ -9,8 +9,6 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
 DB_PATH = ROOT / "orpheus.db"
-VAULT_DIR = ROOT / "vault"
-VAULT_DIR.mkdir(exist_ok=True)
 
 _local = threading.local()
 
@@ -32,17 +30,12 @@ def init() -> None:
         CREATE TABLE IF NOT EXISTS plays(
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             ts INTEGER NOT NULL,
-            kind TEXT NOT NULL,            -- track | station | vinyl
+            kind TEXT NOT NULL,            -- track | station
             track TEXT NOT NULL            -- json blob
-        );
-        CREATE TABLE IF NOT EXISTS vault(
-            video_id TEXT PRIMARY KEY,
-            title TEXT, artist TEXT, album TEXT, art TEXT,
-            duration INTEGER, path TEXT NOT NULL, added_ts INTEGER
         );
         CREATE TABLE IF NOT EXISTS playlists(
             id INTEGER PRIMARY KEY AUTOINCREMENT,
-            source TEXT NOT NULL,          -- spotify | apple | ytmusic
+            source TEXT NOT NULL,          -- spotify
             external_id TEXT,
             name TEXT NOT NULL,
             art TEXT,
@@ -54,7 +47,7 @@ def init() -> None:
             pos INTEGER NOT NULL,
             title TEXT, artist TEXT, album TEXT, art TEXT,
             duration INTEGER,
-            yt_id TEXT,                    -- resolved lazily
+            match_id TEXT,                 -- local track id, matched lazily
             PRIMARY KEY(playlist_id, pos)
         );
         CREATE TABLE IF NOT EXISTS settings(

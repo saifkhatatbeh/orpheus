@@ -25,8 +25,7 @@
     <button data-go="deck"    role="tab" class="on">DECK</button>
     <button data-go="library" role="tab">LIBRARY</button>
     <button data-go="radio"   role="tab">RADIO</button>
-    <button data-go="vinyl"   role="tab">VINYL</button>
-    <button data-go="vault"   role="tab">VAULT</button>
+    <button data-go="files"   role="tab">FILES</button>
   </nav>
   <div class="top-actions">
     <button id="btn-theme" class="chip" title="theme">◐</button>
@@ -53,7 +52,7 @@
       <div id="now">
         <p class="eyebrow mono" id="now-context">STANDBY</p>
         <h1 id="now-title" class="display">SILENCE,<br/>FOR NOW</h1>
-        <p id="now-artist" class="mono dim">search a song · tune the dial · flip to vinyl</p>
+        <p id="now-artist" class="mono dim">search your shelves · tune the dial · light up the sky</p>
 
         <div id="scrub">
           <span id="t-cur" class="mono">0:00</span>
@@ -98,7 +97,7 @@
       <h1 class="display">THE LIBRARY</h1>
       <button id="btn-sources" class="chip acid">+ CONNECT SOURCES</button>
     </div>
-    <p class="mono dim sub">your playlists, imported home · spotify / apple / yt music → local, forever</p>
+    <p class="mono dim sub">your spotify playlists, matched against the files you own</p>
     <div id="lib-grid"></div>
     <div id="lib-detail" class="hidden">
       <button id="lib-back" class="chip">← ALL PLAYLISTS</button>
@@ -119,43 +118,16 @@
   </div>
 </main>
 
-<!-- ============ VINYL ============ -->
-<main id="view-vinyl" class="view">
+<!-- ============ FILES ============ -->
+<main id="view-files" class="view">
   <div class="frame">
-    <section id="vinyl-stage">
-      <div id="vinyl-idle">
-        <p class="eyebrow mono">LINE 1 · TURNTABLE → EDIFIER</p>
-        <h1 class="display">WHAT'S<br/>SPINNING?</h1>
-        <p class="mono dim sub">drop the needle, then let me listen —<br/>use the node closest to the speaker</p>
-        <button id="btn-listen" class="big-cta mono">◉ LISTEN — 8 SEC</button>
-        <p id="vinyl-status" class="mono acid-text"></p>
-      </div>
-      <div id="vinyl-result" class="hidden">
-        <div id="vinyl-sleeve">
-          <img id="vinyl-art" alt="album art" />
-          <div class="corner tl"></div><div class="corner tr"></div>
-          <div class="corner bl"></div><div class="corner br"></div>
-        </div>
-        <div id="vinyl-meta">
-          <p class="eyebrow mono">NOW SPINNING · LINE 1</p>
-          <h1 id="vinyl-title" class="display"></h1>
-          <p id="vinyl-artist" class="mono"></p>
-          <p id="vinyl-album" class="mono dim"></p>
-          <p id="vinyl-extra" class="mono dim"></p>
-          <button id="btn-listen-again" class="chip">◉ LISTEN AGAIN</button>
-        </div>
-      </div>
-    </section>
-  </div>
-</main>
-
-<!-- ============ VAULT ============ -->
-<main id="view-vault" class="view">
-  <div class="frame">
-    <h1 class="display">THE VAULT</h1>
-    <p class="mono dim sub">every track you play is archived here, forever. streaming can't take it back.</p>
-    <p id="vault-stats" class="mono acid-text"></p>
-    <div id="vault-list"></div>
+    <div class="head-row">
+      <h1 class="display">THE SHELVES</h1>
+      <button id="btn-rescan" class="chip acid">RESCAN FOLDER</button>
+    </div>
+    <p class="mono dim sub">every audio file in your library folder, indexed by tags · drop files in, hit rescan</p>
+    <p id="files-stats" class="mono acid-text"></p>
+    <div id="files-list"></div>
   </div>
 </main>
 
@@ -214,12 +186,6 @@
       <input id="dlna-ip" class="line-input mono" placeholder="OR ADD BY IP · 192.168.100.x" />
       <button id="btn-dlna-add" class="chip">ADD</button>
     </div>
-    <div class="rule mono">— ALEXA <span id="alexa-state"></span> —</div>
-    <div id="alexa-devices" class="mono dim small"></div>
-    <div class="alexa-cmd">
-      <input id="alexa-text" class="line-input mono" placeholder='TELL ALEXA… "play jazz on spotify"' />
-      <button id="btn-alexa-send" class="chip acid">SEND</button>
-    </div>
     <button class="chip" data-close>CLOSE</button>
   </div>
 </div>
@@ -228,21 +194,11 @@
 <div id="sources-overlay" class="overlay">
   <div class="panel narrow">
     <h2 class="display">SOURCES</h2>
-    <p class="mono dim small">one-time link → import playlists + likes into the library. tokens stay on this machine.</p>
+    <p class="mono dim small">one-time link → import playlists + likes as metadata, matched to your own files. the token stays on this machine.</p>
     <div class="src" data-src="spotify">
       <div class="src-head mono">SPOTIFY <span class="src-state mono" id="st-spotify">—</span></div>
       <p class="mono dim small">one-time: <b>developer.spotify.com/dashboard</b> → Create app → set Redirect URI to <b id="sp-redirect">http://127.0.0.1:7777/api/sources/spotify/callback</b> → copy the <b>Client ID</b></p>
       <div class="src-row"><input id="in-spotify" class="line-input mono" placeholder="Spotify Client ID"/><button class="chip" id="sp-login">LOGIN WITH SPOTIFY</button><button class="chip acid" data-import="spotify">IMPORT</button></div>
-    </div>
-    <div class="src" data-src="apple">
-      <div class="src-head mono">APPLE MUSIC <span class="src-state mono" id="st-apple">—</span></div>
-      <p class="mono dim small">music.apple.com → DevTools → Network → any amp-api request → copy <b>media-user-token</b> header</p>
-      <div class="src-row"><input id="in-apple" class="line-input mono" placeholder="media-user-token"/><button class="chip" data-link="apple">LINK</button><button class="chip acid" data-import="apple">IMPORT</button></div>
-    </div>
-    <div class="src" data-src="ytmusic">
-      <div class="src-head mono">YOUTUBE MUSIC <span class="src-state mono" id="st-ytmusic">—</span></div>
-      <p class="mono dim small">music.youtube.com → DevTools → Network → any <b>browse</b> POST → right-click → Copy request headers → paste all</p>
-      <div class="src-row"><textarea id="in-ytmusic" class="line-input mono" rows="3" placeholder="paste full request headers"></textarea><button class="chip" data-link="ytmusic">LINK</button><button class="chip acid" data-import="ytmusic">IMPORT</button></div>
     </div>
     <p id="src-status" class="mono acid-text"></p>
     <button class="chip" data-close>CLOSE</button>

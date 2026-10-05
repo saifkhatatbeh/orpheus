@@ -66,6 +66,10 @@ function connect() {
     } else if (m.type === "state" || m.type === "action") {
       S = m.state;
       render(m.type === "action" ? m.action : null);
+    } else if (m.type === "library") {
+      toast(`LIBRARY · ${m.total} TRACKS`);
+      if (document.body.dataset.mode === "files") loadFiles();
+      loadShelves();
     } else if (m.type === "nodes") {
       nodes = m.nodes;
       if (S) { S.active_node = m.active_node; S.party = m.party; }
@@ -168,7 +172,6 @@ function tickerUpdate() {
   bits.push(`${nodes.length} NODE${nodes.length === 1 ? "" : "S"} ONLINE`);
   if (S?.party) bits.push("PARTY MODE ACTIVE");
   if (S?.queue?.length) bits.push(`${S.queue.length} QUEUED`);
-  if (S?.vinyl?.title) bits.push(`LAST VINYL ▸ ${S.vinyl.title}`);
   bits.push("ORPHEUS SOUND SYSTEM · LOCAL FIRST · NO ADS · NO SUITS");
   $("#ticker-inner").textContent = bits.join("   ///   ") + "   ///   ";
 }
@@ -193,7 +196,7 @@ function render(action) {
   } else {
     $("#now-context").textContent = "STANDBY";
     $("#now-title").innerHTML = "SILENCE,<br/>FOR NOW";
-    $("#now-artist").textContent = "search a song · tune the dial · flip to vinyl";
+    $("#now-artist").textContent = "search your shelves · tune the dial · light up the sky";
     setArt(null);
     $("#art-caption").innerHTML = `<span>TRK ——</span>`;
   }
@@ -206,8 +209,6 @@ function render(action) {
     : active ? `▲ SOUNDING ON ${active.name.toUpperCase()}${active.id === me?.id ? " (HERE)" : ""}` : "";
   renderQueue();
   tickerUpdate();
-  if (S.vinyl && S.mode === "vinyl") renderVinyl(S.vinyl);
-  if (action === "vinyl_result") go("vinyl");
   if (t && lyricsOn && lyricsFor !== t.id) loadLyrics(t);
   if (!t) hideLyrics();
   reconcileAudio();
@@ -401,7 +402,7 @@ function go(mode) {
   document.body.dataset.mode = mode;
   if (mode === "radio" && !$("#station-shelves").childElementCount) loadStations();
   if (mode === "library") loadLibrary();
-  if (mode === "vault") loadVault();
+  if (mode === "files") loadFiles();
 }
 $$("#modes button").forEach((b) => (b.onclick = () => go(b.dataset.go)));
 
@@ -547,27 +548,15 @@ async function playFromPlaylist(idx) {
       if (resolved.length && resolved.length % 5 === 0) act("queue_set", { queue: resolved.slice() });
     }
     act("queue_set", { queue: resolved });
-  } catch { toast("NO PLAYABLE MATCH"); }
+  } catch { toast("NOT IN YOUR LIBRARY FOLDER"); }
 }
 $("#lib-playall").onclick = () => playFromPlaylist(0);
 
 /* sources overlay */
 async function srcStatus() {
   const st = await fetch("/api/sources/status").then((r) => r.json());
-  for (const k of ["spotify", "apple", "ytmusic"]) $(`#st-${k}`).textContent = st[k] ? "● LINKED" : "○ NOT LINKED";
+  $("#st-spotify").textContent = st.spotify ? "● LINKED" : "○ NOT LINKED";
 }
-$$("[data-link]").forEach((b) => (b.onclick = async () => {
-  const src = b.dataset.link;
-  const val = $(`#in-${src}`).value.trim();
-  if (!val) return toast("PASTE THE TOKEN FIRST");
-  $("#src-status").textContent = "LINKING…";
-  const body = src === "apple" ? { media_user_token: val } : { headers: val };
-  const r = await fetch(`/api/sources/${src}/link`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
-  const j = await r.json().catch(() => ({}));
-  $("#src-status").textContent = r.ok ? `${src.toUpperCase()} LINKED ✓` : (j.detail || "LINK FAILED");
-  srcStatus();
-}));
-
 /* Spotify — official OAuth PKCE: save Client ID, open consent popup, wait for callback */
 $("#sp-login").onclick = async () => {
   const cid = $("#in-spotify").value.trim();
@@ -646,63 +635,19 @@ $("#station-q").addEventListener("input", (e) => {
   }, 400);
 });
 
-/* ---------- vinyl ---------- */
-async function listen() {
-  const status = $("#vinyl-status"), btn = $("#btn-listen");
-  $("#vinyl-result").classList.add("hidden");
-  $("#vinyl-idle").classList.remove("hidden");
-  try {
-    const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-    const mime = MediaRecorder.isTypeSupported("audio/webm") ? "audio/webm" : "audio/mp4";
-    const rec = new MediaRecorder(stream, { mimeType: mime });
-    const chunks = [];
-    rec.ondataavailable = (e) => chunks.push(e.data);
-    rec.start();
-    btn.classList.add("rec"); btn.textContent = "◉ LISTENING…";
-    let n = 8;
-    status.textContent = `RECORDING ${n}S`;
-    const tick = setInterval(() => { status.textContent = `RECORDING ${--n}S`; }, 1000);
-    await new Promise((res) => setTimeout(res, 8000));
-    clearInterval(tick);
-    rec.stop();
-    await new Promise((res) => (rec.onstop = res));
-    stream.getTracks().forEach((t) => t.stop());
-    btn.classList.remove("rec"); btn.textContent = "◉ LISTEN — 8 SEC";
-    status.textContent = "CONSULTING THE ORACLE…";
-    const fd = new FormData();
-    fd.append("audio", new Blob(chunks, { type: mime }), mime.includes("webm") ? "clip.webm" : "clip.mp4");
-    const r = await fetch("/api/vinyl/recognize", { method: "POST", body: fd }).then((r) => r.json());
-    status.textContent = r.match ? "" : "NO MATCH — GET CLOSER TO THE SPEAKER";
-  } catch (err) {
-    btn.classList.remove("rec"); btn.textContent = "◉ LISTEN — 8 SEC";
-    status.textContent = err.name === "NotAllowedError" ? "MIC PERMISSION DENIED" : `MIC ERROR: ${err.message}`;
-  }
-}
-$("#btn-listen").onclick = listen;
-$("#btn-listen-again").onclick = listen;
-function renderVinyl(v) {
-  $("#vinyl-idle").classList.add("hidden");
-  $("#vinyl-result").classList.remove("hidden");
-  $("#vinyl-art").src = v.art || "";
-  $("#vinyl-title").textContent = v.title || "?";
-  $("#vinyl-artist").textContent = (v.artist || "").toUpperCase();
-  $("#vinyl-album").textContent = v.album ? `FROM “${v.album.toUpperCase()}”` : "";
-  $("#vinyl-extra").textContent = [v.year, v.label].filter(Boolean).join(" · ").toUpperCase();
-}
-
-/* ---------- vault ---------- */
-async function loadVault() {
-  const d = await fetch("/api/vault").then((r) => r.json());
+/* ---------- files (the library folder) ---------- */
+async function loadFiles() {
+  const d = await fetch("/api/files").then((r) => r.json());
   const gb = (d.bytes / 1e9).toFixed(2);
   const hrs = (d.seconds / 3600).toFixed(1);
-  $("#vault-stats").textContent = `${d.count} TRACKS ARCHIVED · ${hrs} HOURS · ${gb} GB · YOURS FOREVER`;
-  const box = $("#vault-list");
-  box.innerHTML = d.tracks.length ? "" : `<p class="mono dim" style="padding:1rem 0">PLAY SOMETHING — IT LANDS HERE AUTOMATICALLY</p>`;
+  $("#files-stats").textContent = `${d.count} TRACKS · ${hrs} HOURS · ${gb} GB · ${d.folder}`;
+  const box = $("#files-list");
+  box.innerHTML = d.tracks.length ? "" : `<p class="mono dim" style="padding:1rem 0">DROP AUDIO FILES INTO ${d.folder} AND HIT RESCAN</p>`;
   d.tracks.forEach((t, i) => {
     const row = document.createElement("div");
     row.className = "t-row";
     row.innerHTML = `<span class="t-i mono">${String(i + 1).padStart(3, "0")}</span><img loading="lazy" src="${t.art || ""}"/>
-      <div><div class="t-t"></div><div class="t-a"></div></div><span class="vaulted mono">● VAULTED</span><span class="t-d mono">${fmt(t.duration)}</span>`;
+      <div><div class="t-t"></div><div class="t-a"></div></div><span class="t-src mono">${(t.album || "").toUpperCase()}</span><span class="t-d mono">${fmt(t.duration)}</span>`;
     row.querySelector(".t-t").textContent = t.title;
     row.querySelector(".t-a").textContent = (t.artist || "").toUpperCase();
     row.onclick = () => { act("play_track", { track: t, radio_seed: null }); go("deck"); };
@@ -710,8 +655,15 @@ async function loadVault() {
   });
 }
 
+$("#btn-rescan").onclick = async () => {
+  $("#files-stats").textContent = "SCANNING…";
+  const r = await fetch("/api/files/rescan", { method: "POST" }).then((r) => r.json());
+  toast(r.running ? "SCAN ALREADY RUNNING" : `+${r.added} · −${r.removed} · ${r.total} TRACKS`);
+  loadFiles();
+};
+
 /* ---------- nodes ---------- */
-$("#btn-nodes").onclick = () => { $("#nodes-overlay").classList.add("on"); loadAlexa(); };
+$("#btn-nodes").onclick = () => { $("#nodes-overlay").classList.add("on"); };
 const KIND_LABEL = { pc: "PC", phone: "PHONE", tablet: "TABLET", dlna: "WIFI", spotify: "FRAME", other: "NODE" };
 function renderNodes() {
   $("#node-count").textContent = nodes.length;
@@ -958,25 +910,6 @@ $("#btn-dlna-add").onclick = async () => {
   const r = await fetch("/api/dlna/add", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ ip }) });
   const j = await r.json().catch(() => ({}));
   $("#dlna-hint").textContent = r.ok ? `ADDED: ${j.renderers.map((x) => x.name).join(", ")} ↑` : (j.detail || "probe failed");
-};
-
-/* Alexa */
-async function loadAlexa() {
-  const st = await fetch("/api/alexa/status").then((r) => r.json());
-  $("#alexa-state").textContent = st.linked ? "· LINKED" : "· NOT LINKED (README)";
-  if (st.linked) {
-    try {
-      const { devices } = await fetch("/api/alexa/devices").then((r) => r.json());
-      $("#alexa-devices").textContent = devices.map((d) => d.name).join(" · ") || "no devices";
-    } catch { $("#alexa-devices").textContent = "cookie expired — re-link"; }
-  }
-}
-$("#btn-alexa-send").onclick = async () => {
-  const text = $("#alexa-text").value.trim();
-  if (!text) return;
-  const r = await fetch("/api/alexa/command", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ text }) });
-  toast(r.ok ? `ALEXA ← “${text}”` : "ALEXA NOT LINKED");
-  if (r.ok) $("#alexa-text").value = "";
 };
 
 /* guest */

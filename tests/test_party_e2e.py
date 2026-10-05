@@ -53,7 +53,9 @@ async def main():
         check("not feeding yet", not st["feeding"])
 
         print("\n[2] play track + party ON  →  feed starts")
-        await send("play_track", {"track": {"id": "qe8Q7mjxjig", "title": "Veridis Quo", "artist": "Daft Punk", "duration": 340}})
+        first = (await c.get(f"{API}/files?limit=1")).json()["tracks"]
+        assert first, "put at least one audio file in the library folder and rescan before running this test"
+        await send("play_track", {"track": first[0]})
         await drain()
         await send("party", {"on": True})
         await asyncio.sleep(4)

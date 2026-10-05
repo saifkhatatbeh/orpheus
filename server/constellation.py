@@ -68,10 +68,9 @@ class Hub:
             "volume": 0.8,
             "active_node": None,    # node id emitting audio
             "party": False,         # all nodes play in sync (snapcast engine)
-            "mode": "deck",         # deck | vinyl | radio
+            "mode": "deck",         # deck | radio
             "radio_seed": None,     # videoId feeding auto-queue
             "station": None,        # live radio station dict
-            "vinyl": None,          # last vinyl recognition result
         }
         self._lock = asyncio.Lock()
 
@@ -192,9 +191,6 @@ class Hub:
                 s["mode"] = "radio"
                 s["position_s"] = 0.0
                 s["epoch_ms"] = now_ms()
-            elif action == "vinyl_result":
-                s["vinyl"] = p["result"]
-                s["mode"] = "vinyl"
             else:
                 return
         await self.broadcast({
