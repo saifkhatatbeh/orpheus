@@ -1,0 +1,268 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+<meta name="theme-color" content="#0000F2" />
+<title>ORPHEUS</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=Space+Mono:ital,wght@0,400;0,700;1,400&display=swap" rel="stylesheet" />
+<link rel="stylesheet" href="/assets/style.css" />
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><rect width='100' height='100' fill='%230000F2'/><circle cx='50' cy='50' r='34' fill='none' stroke='%23EDFF45' stroke-width='8'/><circle cx='50' cy='50' r='9' fill='%23EDFF45'/></svg>" />
+</head>
+<body data-mode="deck">
+
+<canvas id="field" aria-hidden="true"></canvas>
+<div id="artwash" aria-hidden="true"></div>
+
+<header id="topbar">
+  <div class="brand">
+    <span class="brand-name">ORPHEUS</span>
+    <span class="brand-sub mono">SOUND<br/>SYSTEM</span>
+  </div>
+  <nav id="modes" role="tablist" aria-label="mode">
+    <button data-go="deck"    role="tab" class="on">DECK</button>
+    <button data-go="library" role="tab">LIBRARY</button>
+    <button data-go="radio"   role="tab">RADIO</button>
+    <button data-go="vinyl"   role="tab">VINYL</button>
+    <button data-go="vault"   role="tab">VAULT</button>
+  </nav>
+  <div class="top-actions">
+    <button id="btn-theme" class="chip" title="theme">◐</button>
+    <button id="btn-guest" class="chip" title="guest pass">GUEST</button>
+    <button id="btn-search" class="chip">⌕ SEARCH</button>
+    <button id="btn-nodes" class="chip acid"><span id="node-count">0</span> NODES</button>
+  </div>
+</header>
+
+<div id="ticker"><div id="ticker-inner" class="mono"></div></div>
+
+<!-- ============ DECK ============ -->
+<main id="view-deck" class="view on">
+  <div class="frame">
+    <section class="stage">
+      <div id="art-block">
+        <div id="art-frame">
+          <img id="disc-art" alt="" draggable="false" />
+          <div id="art-empty" class="mono">[ NO SIGNAL ]<br/>·<br/>DROP THE NEEDLE</div>
+          <div id="art-scan"></div>
+        </div>
+        <div id="art-caption" class="mono">TRK ——</div>
+      </div>
+      <div id="now">
+        <p class="eyebrow mono" id="now-context">STANDBY</p>
+        <h1 id="now-title" class="display">SILENCE,<br/>FOR NOW</h1>
+        <p id="now-artist" class="mono dim">search a song · tune the dial · flip to vinyl</p>
+
+        <div id="scrub">
+          <span id="t-cur" class="mono">0:00</span>
+          <input id="seek" type="range" min="0" max="100" value="0" step="0.1" aria-label="seek" />
+          <span id="t-dur" class="mono">0:00</span>
+        </div>
+
+        <div id="transport">
+          <button id="btn-prev" class="tb mono" aria-label="previous">|&lt;</button>
+          <button id="btn-play" class="tb big mono" aria-label="play/pause">PLAY&nbsp;▶</button>
+          <button id="btn-next" class="tb mono" aria-label="next">&gt;|</button>
+          <button id="btn-radio-seed" class="tb mono" title="song radio from this track">∞</button>
+          <button id="btn-lyrics" class="tb mono" title="lyrics">LYR</button>
+        </div>
+        <div id="vol-row">
+          <span class="mono dim">VOL</span>
+          <input id="vol" type="range" min="0" max="1" step="0.02" value="0.8" aria-label="volume" />
+          <span id="vol-pct" class="mono dim">80</span>
+        </div>
+        <p id="active-on" class="mono acid-text"></p>
+      </div>
+    </section>
+
+    <section id="lyrics-panel" class="hidden">
+      <div id="lyrics-scroll"></div>
+    </section>
+
+    <section id="queue-strip">
+      <h2 class="rule-title mono">UP NEXT <span id="queue-n"></span><button id="btn-clear-queue" class="chip tiny">CLEAR</button></h2>
+      <div id="queue" class="rail"></div>
+    </section>
+
+    <section id="rewind-wrap"></section>
+    <section id="shelves"></section>
+  </div>
+</main>
+
+<!-- ============ LIBRARY ============ -->
+<main id="view-library" class="view">
+  <div class="frame">
+    <div class="head-row">
+      <h1 class="display">THE LIBRARY</h1>
+      <button id="btn-sources" class="chip acid">+ CONNECT SOURCES</button>
+    </div>
+    <p class="mono dim sub">your playlists, imported home · spotify / apple / yt music → local, forever</p>
+    <div id="lib-grid"></div>
+    <div id="lib-detail" class="hidden">
+      <button id="lib-back" class="chip">← ALL PLAYLISTS</button>
+      <div class="head-row"><h2 id="lib-title" class="display"></h2><button id="lib-playall" class="chip acid">PLAY ALL ▶</button></div>
+      <p id="lib-meta" class="mono dim sub"></p>
+      <div id="lib-tracks"></div>
+    </div>
+  </div>
+</main>
+
+<!-- ============ RADIO ============ -->
+<main id="view-radio" class="view">
+  <div class="frame">
+    <h1 class="display">THE DIAL</h1>
+    <p class="mono dim sub">live from everywhere · 30,000 stations · no accounts</p>
+    <input id="station-q" class="line-input mono" type="search" placeholder="SEARCH THE AIRWAVES…" />
+    <div id="station-shelves"></div>
+  </div>
+</main>
+
+<!-- ============ VINYL ============ -->
+<main id="view-vinyl" class="view">
+  <div class="frame">
+    <section id="vinyl-stage">
+      <div id="vinyl-idle">
+        <p class="eyebrow mono">LINE 1 · TURNTABLE → EDIFIER</p>
+        <h1 class="display">WHAT'S<br/>SPINNING?</h1>
+        <p class="mono dim sub">drop the needle, then let me listen —<br/>use the node closest to the speaker</p>
+        <button id="btn-listen" class="big-cta mono">◉ LISTEN — 8 SEC</button>
+        <p id="vinyl-status" class="mono acid-text"></p>
+      </div>
+      <div id="vinyl-result" class="hidden">
+        <div id="vinyl-sleeve">
+          <img id="vinyl-art" alt="album art" />
+          <div class="corner tl"></div><div class="corner tr"></div>
+          <div class="corner bl"></div><div class="corner br"></div>
+        </div>
+        <div id="vinyl-meta">
+          <p class="eyebrow mono">NOW SPINNING · LINE 1</p>
+          <h1 id="vinyl-title" class="display"></h1>
+          <p id="vinyl-artist" class="mono"></p>
+          <p id="vinyl-album" class="mono dim"></p>
+          <p id="vinyl-extra" class="mono dim"></p>
+          <button id="btn-listen-again" class="chip">◉ LISTEN AGAIN</button>
+        </div>
+      </div>
+    </section>
+  </div>
+</main>
+
+<!-- ============ VAULT ============ -->
+<main id="view-vault" class="view">
+  <div class="frame">
+    <h1 class="display">THE VAULT</h1>
+    <p class="mono dim sub">every track you play is archived here, forever. streaming can't take it back.</p>
+    <p id="vault-stats" class="mono acid-text"></p>
+    <div id="vault-list"></div>
+  </div>
+</main>
+
+<!-- ============ SEARCH ============ -->
+<div id="search-overlay" class="overlay">
+  <div class="panel">
+    <div class="search-row">
+      <input id="q" class="line-input mono" type="search" placeholder="SONGS / ALBUMS / ARTISTS…" autocomplete="off" />
+      <button class="chip" data-close>ESC</button>
+    </div>
+    <div id="search-kinds">
+      <button data-kind="songs" class="on mono">SONGS</button>
+      <button data-kind="albums" class="mono">ALBUMS</button>
+      <button data-kind="artists" class="mono">ARTISTS</button>
+    </div>
+    <div id="results"></div>
+  </div>
+</div>
+
+<!-- ============ NODES ============ -->
+<div id="nodes-overlay" class="overlay">
+  <div class="panel narrow">
+    <h2 class="display">CONSTELLATION</h2>
+    <p class="mono dim small">every open tab is a speaker · music frame joins via wifi scan · sound follows the active node</p>
+    <div id="node-list"></div>
+    <label id="party-row" class="mono">
+      <input type="checkbox" id="party-toggle" />
+      <span>PARTY MODE — all nodes in sync</span>
+    </label>
+    <div id="party-tune" class="hidden">
+      <div id="party-status" class="mono dim small">checking engine…</div>
+      <div id="sky-wrap">
+        <svg id="sky" viewBox="0 0 640 420" preserveAspectRatio="xMidYMid meet"></svg>
+        <div id="star-card" class="hidden"></div>
+      </div>
+      <div class="mono dim small" style="margin:.35rem 0 .1rem">
+        tap a star to tune it · drag stars to draw your own constellation ·
+        size&nbsp;=&nbsp;volume · color&nbsp;=&nbsp;role
+      </div>
+      <details id="add-speakers">
+        <summary class="mono">+ ADD SPEAKERS TO THE SKY</summary>
+        <button id="btn-party-join" class="chip acid" style="margin:.4rem 0">🔊 THIS DEVICE (opens synced player)</button>
+        <div class="mono dim small">bluetooth / wired speakers on the server PC — pair in Windows first, then:</div>
+        <button id="btn-outputs-scan" class="chip" style="margin:.3rem 0">↻ SCAN PC AUDIO DEVICES</button>
+        <div id="party-outputs"></div>
+        <div class="mono dim small" style="margin-top:.4rem">PC + Edifier native client (1ms): <b>party\snapclient\snapclient.exe</b></div>
+      </details>
+    </div>
+    <div class="rule mono">— MUSIC FRAME · SPOTIFY CONNECT —</div>
+    <div id="frame-hint" class="mono dim small">a Samsung Music Frame announces itself via Spotify Connect only — link Spotify in Sources, then:</div>
+    <button id="btn-frame-scan" class="chip acid">FIND CONNECT DEVICES</button>
+    <div class="rule mono">— OTHER WIFI SPEAKERS / DLNA —</div>
+    <div id="dlna-hint" class="mono dim small">for DLNA renderers (TVs, receivers, some soundbars)</div>
+    <button id="btn-dlna-scan" class="chip">SCAN WIFI</button>
+    <div class="src-row" style="margin-top:.6rem">
+      <input id="dlna-ip" class="line-input mono" placeholder="OR ADD BY IP · 192.168.100.x" />
+      <button id="btn-dlna-add" class="chip">ADD</button>
+    </div>
+    <div class="rule mono">— ALEXA <span id="alexa-state"></span> —</div>
+    <div id="alexa-devices" class="mono dim small"></div>
+    <div class="alexa-cmd">
+      <input id="alexa-text" class="line-input mono" placeholder='TELL ALEXA… "play jazz on spotify"' />
+      <button id="btn-alexa-send" class="chip acid">SEND</button>
+    </div>
+    <button class="chip" data-close>CLOSE</button>
+  </div>
+</div>
+
+<!-- ============ SOURCES ============ -->
+<div id="sources-overlay" class="overlay">
+  <div class="panel narrow">
+    <h2 class="display">SOURCES</h2>
+    <p class="mono dim small">one-time link → import playlists + likes into the library. tokens stay on this machine.</p>
+    <div class="src" data-src="spotify">
+      <div class="src-head mono">SPOTIFY <span class="src-state mono" id="st-spotify">—</span></div>
+      <p class="mono dim small">one-time: <b>developer.spotify.com/dashboard</b> → Create app → set Redirect URI to <b id="sp-redirect">http://127.0.0.1:7777/api/sources/spotify/callback</b> → copy the <b>Client ID</b></p>
+      <div class="src-row"><input id="in-spotify" class="line-input mono" placeholder="Spotify Client ID"/><button class="chip" id="sp-login">LOGIN WITH SPOTIFY</button><button class="chip acid" data-import="spotify">IMPORT</button></div>
+    </div>
+    <div class="src" data-src="apple">
+      <div class="src-head mono">APPLE MUSIC <span class="src-state mono" id="st-apple">—</span></div>
+      <p class="mono dim small">music.apple.com → DevTools → Network → any amp-api request → copy <b>media-user-token</b> header</p>
+      <div class="src-row"><input id="in-apple" class="line-input mono" placeholder="media-user-token"/><button class="chip" data-link="apple">LINK</button><button class="chip acid" data-import="apple">IMPORT</button></div>
+    </div>
+    <div class="src" data-src="ytmusic">
+      <div class="src-head mono">YOUTUBE MUSIC <span class="src-state mono" id="st-ytmusic">—</span></div>
+      <p class="mono dim small">music.youtube.com → DevTools → Network → any <b>browse</b> POST → right-click → Copy request headers → paste all</p>
+      <div class="src-row"><textarea id="in-ytmusic" class="line-input mono" rows="3" placeholder="paste full request headers"></textarea><button class="chip" data-link="ytmusic">LINK</button><button class="chip acid" data-import="ytmusic">IMPORT</button></div>
+    </div>
+    <p id="src-status" class="mono acid-text"></p>
+    <button class="chip" data-close>CLOSE</button>
+  </div>
+</div>
+
+<!-- ============ GUEST QR ============ -->
+<div id="guest-overlay" class="overlay">
+  <div class="panel narrow center">
+    <h2 class="display">GUEST PASS</h2>
+    <p class="mono dim small">anyone on your wifi scans → queues songs from their phone.<br/>no app. no account. you keep the wheel.</p>
+    <div id="guest-qr"></div>
+    <p id="guest-url" class="mono acid-text"></p>
+    <button class="chip" data-close>CLOSE</button>
+  </div>
+</div>
+
+<audio id="player" preload="auto"></audio>
+<div id="toast" class="mono"></div>
+
+<script src="/assets/app.js"></script>
+</body>
+</html>

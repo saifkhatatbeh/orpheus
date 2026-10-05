@@ -1,0 +1,28 @@
+# --- personal data: NEVER commit ---
+orpheus.db
+orpheus.db-*
+alexa_cookie.json
+vault/
+*.m4a
+*.mp3
+*.opus
+*.webm
+
+# --- python ---
+.venv/
+__pycache__/
+*.pyc
+*.egg-info/
+
+# --- party engine: binaries are downloaded by setup, not vendored ---
+party/snapclient/
+party/snapweb/
+party/snapweb.zip
+
+# --- scratch / editor ---
+_*.py
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
+*.log

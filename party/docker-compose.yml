@@ -1,0 +1,35 @@
+services:
+  snapserver:
+    image: sweisgerber/snapcast:latest
+    container_name: orpheus-snapserver
+    restart: unless-stopped
+    entrypoint: ["snapserver", "-c", "/etc/snapserver-orpheus.conf"]
+    ports:
+      - "1704:1704"   # snapclient stream (native clients)
+      - "1705:1705"   # control TCP (JSON-RPC)
+      - "1780:1780"   # HTTP: snapweb UI + websocket stream + JSON-RPC
+      - "4953:4953"   # ffmpeg source: FULL (whole track)
+      - "4954:4954"   # ffmpeg source: THUMP (bass band)
+      - "4955:4955"   # ffmpeg source: HEART (mid band)
+      - "4956:4956"   # ffmpeg source: AIR (treble band)
+    volumes:
+      - ./snapserver.conf:/etc/snapserver-orpheus.conf:ro
+      - ./snapweb:/usr/share/snapserver/snapweb:ro
+      - snapstate:/root/.config/snapserver   # persist names/volumes/groups across restarts
+
+  # keeps the shared VM kernel clock honest — snapcast sync depends on a
+  # steady server clock and this machine's WSL2 VM slews ~7.5ms/s without it
+  chrony:
+    image: alpine:3.20
+    container_name: orpheus-chrony
+    restart: unless-stopped
+    cap_add:
+      - SYS_TIME
+    volumes:
+      - ./chrony.conf:/etc/chrony/chrony.conf:ro
+    # rm the stale pidfile: on container restart the old one survives in the
+    # writable layer and chronyd refuses to start ("already running pid=1")
+    command: sh -c "apk add --no-cache chrony >/dev/null && rm -f /var/run/chrony/chronyd.pid && exec chronyd -d -f /etc/chrony/chrony.conf"
+
+volumes:
+  snapstate:
